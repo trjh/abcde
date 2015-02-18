@@ -3681,6 +3681,9 @@ DOMOVE=n
 DOREPLAYGAIN=n
 DOPLAYLIST=n
 DOCLEAN=n
+DOBEET=n
+echo "THIS IS MODIFIED BY TRJH" # so I know which version I'm using
+				# to be removed before upstream push, if any
 ## FIXME ## Lets keep compatibility with -M
 [ "$DOCUE" != "y" ] && DOCUE=n
 
@@ -3700,6 +3703,7 @@ do
 		replaygain) DOCDDB=y; DOREAD=y; DOENCODE=y; DOTAG=y; DOMOVE=y; DOREPLAYGAIN=y;;
 		playlist) DOCDDB=y; DOPLAYLIST=y;;
 		clean) DOCLEAN=y;;
+		beet) DOBEET=y;;
 	esac
 done
 
@@ -4282,6 +4286,49 @@ if [ "$DOCDDB" = "y" ]; then
 					do_musicbrainz
 					;;
 			esac
+
+			## TRJH: This is crude, but so far seems to be an
+			#        effective "fall back to CDDB" method
+			CHOICE=$(checkstatus cddb-choice)
+			if [ "$CHOICE" = 0 -a "$CDDBMETHOD" = "musicbrainz" ];
+			then
+			    # fall back to cddb
+			    cat "$ABCDETEMPDIR/cddbchoices"
+			    CDDBMETHOD="cddb"
+			    echo "Trying CDD...redoing discid"
+			    # cleanup
+			    echo ABCDETEMPDIR is now $ABCDETEMPDIR
+			    MUSICBRAINZDISCID=$TRACKINFO	# save
+			    TRACKQUEUE=""
+			    QUEUEDTRACKS=""
+			    #rm -rf ${ABCDETEMPDIR}
+			    #ABCDETEMPDIR=""
+## we'd removed the tempdir previously, but it broke 'choice'
+## why is it doing this?
+# ABCDETEMPDIR is now /tmp/abcde.y8fWNSyFPMAndEvkqVXn3IvWDL4-
+# Grabbing entire CD - tracks: 01 02 03 04 05 06 07 08 09 10 11 12 13
+# abcde: attempting to resume from /tmp/abcde.y8fWNSyFPMAndEvkqVXn3IvWDL4-..
+# ABCDETEMPDIR is now /tmp/abcde.y8fWNSyFPMAndEvkqVXn3IvWDL4-
+# ...checking cddb
+#
+# right, let's just remove it again and see what breaks in that situation
+# ABCDETEMPDIR is now /tmp/abcde.y8fWNSyFPMAndEvkqVXn3IvWDL4-
+# cat: /tmp/abcde.y8fWNSyFPMAndEvkqVXn3IvWDL4-/discid: No such file or directory
+# Grabbing entire CD - tracks: 01 02 03 04 05 06 07 08 09 10 11 12 13
+# ABCDETEMPDIR is now /tmp/abcde.
+# ...checking cddb
+# abcde: internal error: cddb-choice not recorded.
+			    # perhaps this will sort it?
+			    DISCID=""
+			    # redo
+			    do_discid
+			    echo ABCDETEMPDIR is now $ABCDETEMPDIR
+			    echo $MUSICBRAINZDISCID > ${ABCDETEMPDIR}/mbdiscid
+			    echo "...checking cddb"
+			    do_cddbstat
+			    do_cddbquery
+			    do_cddbread
+			fi
 		fi
 		CHOICE=$(checkstatus cddb-choice)
 		if [ "$CHOICE" = 0 ] ; then
@@ -4674,6 +4721,33 @@ else
 	echo "Finished. Not cleaning $ABCDETEMPDIR."
 fi
 )
+
+## TRJH: import the cd with beets -- but before that, dump a short summary of
+## MusicBrainz releases corresponding to the CDID we saw -- if our DISCID was
+## from MusicBrainz
+
+if [ "$DOBEET" = "y" ]; then
+    # my custom beet import script -- check the ID against
+    if [[ ! -z "$MUSICBRAINZDISCID" ]]; then
+	DISCID=$MUSICBRAINZDISCID
+    fi
+
+    if [[  ${#DISCID} -eq 28 ]]; then
+	lynx -dump http://musicbrainz.org/cdtoc/$DISCID | \
+	perl -ne 'if ($attached) {if (/^References/) {$attached=0} else {print}};' \
+	      -e 'if (/^Attached/) { $attached=1 };' \
+	      -e 'if (/^\s*([\d.]+) http:..musicbrainz.org.release.(.+)/) { print "$1 $2\n" }'
+	echo " "
+    fi
+    beet import -t $ABCDETEMPDIR
+    echo " "
+    ls $ABCDETEMPDIR
+    echo -n "REMOVE $ABCDETEMPDIR? [Y/n] "
+    read answer
+    if [[ "$answer" != "n" ]]; then
+	/bin/rm -rvf $ABCDETEMPDIR
+    fi
+fi
 exit 0
 
 # b:is_bash
