@@ -4193,6 +4193,7 @@ if [ "$USEPIPES" = "y" ]; then
 fi
 
 # Make sure a buncha things exist
+echo EJECT $EJECT
 for X in $CDROMREADER $CDDISCID ${NEEDTAGGER+$TAGGER} $MP3ENCODER \
 	$OGGENCODER $OPUSENCODER $FLACENCODER $SPEEXENCODER $MPCENCODER \
 	$AACENCODER $WVENCODER $CDDBTOOL \
@@ -4204,6 +4205,7 @@ for X in $CDROMREADER $CDDISCID ${NEEDTAGGER+$TAGGER} $MP3ENCODER \
 	${NEEDMPPGAIN+$MPPGAIN} ${NEEDCUEREADER+$CUEREADER} \
 	${NEEDCUE2DISCID+$CUE2DISCID}
 do
+echo checkexec "$X"
 	checkexec "$X"
 done
 
@@ -4738,6 +4740,7 @@ if [ "$DOBEET" = "y" ]; then
 	      -e 'if (/^Attached/) { $attached=1 };' \
 	      -e 'if (/^\s*([\d.]+) http:..musicbrainz.org.release.(.+)/) { print "$1 $2\n" }'
 	echo " "
+	echo "http://musicbrainz.org/cdtoc/$cdid"
     fi
     beet import -t $ABCDETEMPDIR
     echo " "
